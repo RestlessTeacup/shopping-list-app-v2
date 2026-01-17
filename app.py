@@ -29,8 +29,6 @@ def init_db():
 def index():
     return render_template('index.html')
 
-# --- СПИСКИ ---
-
 @app.route('/api/lists', methods=['GET'])
 def get_lists():
     conn = get_db_connection()
@@ -54,7 +52,6 @@ def create_list():
 
 @app.route('/api/lists/<int:list_id>', methods=['PUT'])
 def update_list(list_id):
-    # Редактирование названия списка
     data = request.get_json()
     name = data.get('name')
     if not name:
@@ -102,8 +99,6 @@ def get_list_detail(list_id):
         "items": [dict(ix) for ix in items]
     }
     return jsonify(result)
-
-# --- ТОВАРЫ В СПИСКЕ ---
 
 @app.route('/api/lists/<int:list_id>/items', methods=['POST'])
 def add_item_to_list(list_id):
@@ -159,8 +154,6 @@ def delete_item(item_id):
     conn.commit()
     conn.close()
     return '', 204
-
-# --- СПРАВОЧНИКИ (Только чтение) ---
 
 @app.route('/api/products', methods=['GET'])
 def get_products():

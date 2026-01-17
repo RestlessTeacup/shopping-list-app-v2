@@ -36,7 +36,6 @@
 
     <div class="section" v-else>
         <button @click="goBack">[<] Назад</button>
-        <!-- Заголовок списка с кнопкой редактирования -->
         <h2>{{ activeList.name }} <button @click="renameList" title="Переименовать">✏️</button></h2>
         
         <div style="background: #eee; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc;">
@@ -135,7 +134,6 @@
                 } catch (e) { error.value = e.message; }
             };
 
-            // --- РЕДАКТИРОВАНИЕ СПИСКА ---
             const renameList = async () => {
                 const newName = prompt("Новое название списка:", activeList.value.name);
                 if (newName) {
@@ -144,8 +142,8 @@
                             method: 'PUT', headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ name: newName })
                         });
-                        activeList.value.name = newName; // Оптимистичное обновление UI
-                        fetchLists(); // Обновить список сзади
+                        activeList.value.name = newName;
+                        fetchLists();
                     } catch (e) { error.value = e.message; }
                 }
             };
