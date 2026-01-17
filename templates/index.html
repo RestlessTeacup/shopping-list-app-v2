@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Список покупок</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin-bottom: 10px; padding: 5px; border-bottom: 1px solid #ccc; }
+        button { cursor: pointer; margin-left: 5px; padding: 3px 8px; }
+        .completed { text-decoration: line-through; color: gray; }
+        .section { margin-bottom: 30px; border: 1px solid #000; padding: 10px; }
+        select { padding: 3px; }
+    </style>
+</head>
+<body>
+
+{% raw %}
+<div id="app">
+    <h1>Список покупок</h1>
+
+    <div class="section" v-if="!activeList">
+        <h2>Мои списки</h2>
+        <button @click="createList">[+] Новый список</button>
+        <br><br>
+        <div v-if="loading">Загрузка...</div>
+        <ul v-else>
+            <li v-for="list in lists" :key="list.id">
+                <b>{{ list.name }}</b> ({{ list.created_date }})
+                <button @click="openList(list.id)">Открыть</button>
+                <button @click="deleteList(list.id)" style="color: red;">[X]</button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section" v-else>
+        <button @click="goBack">[<] Назад</button>
+        <!-- Заголовок списка с кнопкой редактирования -->
+        <h2>{{ activeList.name }} <button @click="renameList" title="Переименовать">✏️</button></h2>
+        
+        <div style="background: #eee; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc;">
+            <b>Добавить:</b>
+            <select v-model="newItem.product_id">
+                <option value="" disabled>-- Товар --</option>
+                <option v-for="p in products" :value="p.id" :key="p.id">{{ p.name }} ({{ p.unit }})</option>
+            </select>
+            <select v-model="newItem.store_id">
+                <option :value="null">-- Магазин --</option>
+                <option v-for="s in stores" :value="s.id" :key="s.id">{{ s.name }}</option>
+            </select>
+            Кол-во: <input type="number" v-model.number="newItem.quantity" style="width: 50px;">
+            <button @click="addItem">[+] В список</button>
+        </div>
+
+        <div v-if="loadingItems">Загрузка...</div>
+        <ul v-else>
+            <li v-for="item in activeList.items" :key="item.id" :class="{ completed: item.is_purchased }">
+                <b>{{ item.product_name }}</b> 
+                <input type="number" v-model.number="item.quantity" @change="updateItemQuantity(item)" style="width: 50px;">
+                {{ item.unit }}
+                <span v-if="item.store_name"> - <i>{{ item.store_name }}</i></span>
+                <button @click="toggleItem(item)">{{ item.is_purchased ? 'Вернуть' : 'Купить' }}</button>
+                <button @click="deleteItem(item.id)" style="color: red;">[X]</button>
+            </li>
+        </ul>
+        <div v-if="!activeList.items || activeList.items.length === 0">Список пуст.</div>
+    </div>
+
+    <div style="color: red;" v-if="error">{{ error }}</div>
+</div>
+{% endraw %}
+
+<script>
+    const { createApp, ref, onMounted } = Vue;
+
+    createApp({
+        setup() {
+            const lists = ref([]);
+            const activeList = ref(null);
+            const products = ref([]);
+            const stores = ref([]);
+            const newItem = ref({ product_id: "", store_id: null, quantity: 1 });
+            const loading = ref(false);
+            const loadingItems = ref(false);
+            const error = ref(null);
+            const API_URL = 'http://127.0.0.1:5000/api';
+
+            const fetchLists = async () => {
+                loading.value = true;
+                try {
+                    const response = await fetch(`${API_URL}/lists`);
+                    lists.value = await response.json();
+                } catch (e) { error.value = e.message; } 
+                finally { loading.value = false; }
+            };
+
+            const fetchProducts = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/products`);
+                    products.value = await response.json();
+                } catch (e) { error.value = e.message; }
+            };
+
+            const fetchStores = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/stores`);
+                    stores.value = await response.json();
+                } catch (e) { error.value = e.message; }
+            };
+
+            const openList = async (id) => {
+                loadingItems.value = true;
+                try {
+                    const response = await fetch(`${API_URL}/lists/${id}`);
+                    activeList.value = await response.json();
+                } catch (e) { error.value = e.message; }
+                finally { loadingItems.value = false; }
+            };
+
+            const goBack = () => {
+                activeList.value = null;
+                fetchLists();
+            };
+
+            const createList = async () => {
+                const name = prompt("Название списка:");
+                if (!name) return;
+                try {
+                    await fetch(`${API_URL}/lists`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                    fetchLists();
+                } catch (e) { error.value = e.message; }
+            };
+
+            // --- РЕДАКТИРОВАНИЕ СПИСКА ---
+            const renameList = async () => {
+                const newName = prompt("Новое название списка:", activeList.value.name);
+                if (newName) {
+                    try {
+                        await fetch(`${API_URL}/lists/${activeList.value.id}`, {
+                            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: newName })
+                        });
+                        activeList.value.name = newName; // Оптимистичное обновление UI
+                        fetchLists(); // Обновить список сзади
+                    } catch (e) { error.value = e.message; }
+                }
+            };
+
+            const deleteList = async (id) => {
+                if (!confirm("Удалить список?")) return;
+                try {
+                    await fetch(`${API_URL}/lists/${id}`, { method: 'DELETE' });
+                    if (activeList.value && activeList.value.id === id) activeList.value = null;
+                    fetchLists();
+                } catch (e) { error.value = e.message; }
+            };
+
+            const addItem = async () => {
+                if (!newItem.value.product_id) return;
+                try {
+                    await fetch(`${API_URL}/lists/${activeList.value.id}/items`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newItem.value)
+                    });
+                    newItem.value = { product_id: "", store_id: null, quantity: 1 };
+                    openList(activeList.value.id);
+                } catch (e) { error.value = e.message; }
+            };
+
+            const toggleItem = async (item) => {
+                try {
+                    const res = await fetch(`${API_URL}/items/${item.id}/toggle`, { method: 'PUT' });
+                    if (res.ok) item.is_purchased = await res.json().then(d => d.is_purchased);
+                } catch (e) { error.value = e.message; }
+            };
+
+            const updateItemQuantity = async (item) => {
+                try {
+                    await fetch(`${API_URL}/items/${item.id}`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ quantity: item.quantity })
+                    });
+                } catch (e) { error.value = e.message; }
+            };
+
+            const deleteItem = async (id) => {
+                try {
+                    await fetch(`${API_URL}/items/${id}`, { method: 'DELETE' });
+                    openList(activeList.value.id);
+                } catch (e) { error.value = e.message; }
+            };
+
+            onMounted(() => {
+                fetchLists();
+                fetchProducts();
+                fetchStores();
+            });
+
+            return {
+                lists, activeList, products, stores, newItem,
+                loading, loadingItems, error,
+                openList, goBack, createList, renameList, deleteList,
+                addItem, toggleItem, updateItemQuantity, deleteItem
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
