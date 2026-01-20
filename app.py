@@ -8,11 +8,19 @@ DB_NAME = 'shopping_list.db'
 SQL_SCRIPT_FILE = 'shopping_list.db.sql'
 
 def get_db_connection():
+    """
+    Функция для создания соединения с базой данных.
+    Возвращает объект соединения.
+    """
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
+    """
+    Функция инициализации базы данных.
+    Проверяет, существует ли файл БД.
+    """
     if not os.path.exists(DB_NAME):
         print(f"Creating database '{DB_NAME}' from '{SQL_SCRIPT_FILE}'...")
         with open(SQL_SCRIPT_FILE, 'r', encoding='utf-8') as f:
@@ -27,10 +35,18 @@ def init_db():
 
 @app.route('/')
 def index():
+    """
+    Обрабатывает корневой URL.
+    Использует render_template для поиска HTML-файла в папке 'templates' и отправки его клиенту.
+    """
     return render_template('index.html')
 
 @app.route('/api/lists', methods=['GET'])
 def get_lists():
+    """
+    Получить все списки покупок.
+    HTTP Метод: GET
+    """
     conn = get_db_connection()
     lists = conn.execute('SELECT * FROM shopping_lists').fetchall()
     conn.close()
@@ -38,6 +54,11 @@ def get_lists():
 
 @app.route('/api/lists', methods=['POST'])
 def create_list():
+    """
+    Создать новый список.
+    HTTP Метод: POST
+    Ожидает JSON тело: {"name": "Название списка"}
+    """
     data = request.get_json()
     name = data.get('name')
     if not name:
@@ -52,6 +73,11 @@ def create_list():
 
 @app.route('/api/lists/<int:list_id>', methods=['PUT'])
 def update_list(list_id):
+    """
+    Обновить название списка.
+    HTTP Метод: PUT
+    URL параметр: list_id (целое число)
+    """
     data = request.get_json()
     name = data.get('name')
     if not name:
@@ -65,6 +91,10 @@ def update_list(list_id):
 
 @app.route('/api/lists/<int:list_id>', methods=['DELETE'])
 def delete_list(list_id):
+    """
+    Удалить список.
+    HTTP Метод: DELETE
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM list_items WHERE list_id = ?', (list_id,))
@@ -75,6 +105,10 @@ def delete_list(list_id):
 
 @app.route('/api/lists/<int:list_id>', methods=['GET'])
 def get_list_detail(list_id):
+    """
+    Получить детальную информацию о списке с товарами.
+    Использует JOIN.
+    """
     conn = get_db_connection()
     list_info = conn.execute('SELECT * FROM shopping_lists WHERE id = ?', (list_id,)).fetchone()
     if list_info is None:
@@ -102,6 +136,9 @@ def get_list_detail(list_id):
 
 @app.route('/api/lists/<int:list_id>/items', methods=['POST'])
 def add_item_to_list(list_id):
+    """
+    Добавить товар в конкретный список.
+    """
     data = request.get_json()
     product_id = data.get('product_id')
     store_id = data.get('store_id')
@@ -120,6 +157,9 @@ def add_item_to_list(list_id):
 
 @app.route('/api/items/<int:item_id>/toggle', methods=['PUT'])
 def toggle_item_status(item_id):
+    """
+    Переключить статус "Куплено" / "Не куплено".
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT is_purchased FROM list_items WHERE id = ?', (item_id,))
@@ -135,6 +175,9 @@ def toggle_item_status(item_id):
 
 @app.route('/api/items/<int:item_id>', methods=['PUT'])
 def update_item(item_id):
+    """
+    Обновить количество товара.
+    """
     data = request.get_json()
     quantity = data.get('quantity')
     if quantity is None:
@@ -148,6 +191,9 @@ def update_item(item_id):
 
 @app.route('/api/items/<int:item_id>', methods=['DELETE'])
 def delete_item(item_id):
+    """
+    Удалить товар из списка.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM list_items WHERE id = ?', (item_id,))
@@ -157,6 +203,9 @@ def delete_item(item_id):
 
 @app.route('/api/products', methods=['GET'])
 def get_products():
+    """
+    Получить список всех доступных товаров (справочник).
+    """
     conn = get_db_connection()
     products = conn.execute('SELECT * FROM products').fetchall()
     conn.close()
@@ -164,6 +213,9 @@ def get_products():
 
 @app.route('/api/stores', methods=['GET'])
 def get_stores():
+    """
+    Получить список всех магазинов (справочник).
+    """
     conn = get_db_connection()
     stores = conn.execute('SELECT * FROM stores').fetchall()
     conn.close()
